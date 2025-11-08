@@ -1,6 +1,7 @@
 // routes/users.js
 const mongoose = require('mongoose');
 const User = require('../models/user');
+const Recipe = require('../models/recipe');
 const { buildQuery } = require('./utils');
 
 module.exports = function (router) {
@@ -74,6 +75,94 @@ module.exports = function (router) {
         return res.status(201).json({ message: 'User created', data: savedUser });
       } catch (err) {
         return res.status(500).json({ message: 'Server error creating user', data: err.message });
+      }
+    });
+
+  // POST add favorite recipe (must be before /users/:id to avoid route conflict)
+  router.route('/users/:id/favorites')
+    .post(async (req, res) => {
+      const id = req.params.id.trim();
+      try {
+        const { recipe_id, title } = req.body;
+
+        // Validate recipe_id
+        if (recipe_id === undefined || recipe_id === null) {
+          return res.status(400).json({ message: 'recipe_id is required', data: [] });
+        }
+
+        // Find user
+        const user = await User.findById(id);
+        if (!user) {
+          return res.status(404).json({ message: 'User not found', data: [] });
+        }
+
+        // Find recipe to get title if not provided
+        const recipe = await Recipe.findOne({ id: recipe_id });
+        if (!recipe) {
+          return res.status(404).json({ message: 'Recipe not found', data: [] });
+        }
+
+        // Use provided title or recipe title
+        const recipeTitle = title || recipe.title;
+
+        // Check if already favorited
+        const existingFavorite = user.favorites.find(
+          fav => fav.recipe_id === recipe_id
+        );
+        if (existingFavorite) {
+          return res.status(400).json({ message: 'Recipe already in favorites', data: [] });
+        }
+
+        // Add to favorites
+        const newFavorite = {
+          recipe_id: recipe_id,
+          title: recipeTitle,
+          saved_at: new Date()
+        };
+        user.favorites.push(newFavorite);
+        user.updated_at = new Date();
+
+        const savedUser = await user.save();
+        return res.status(201).json({ message: 'Favorite added', data: savedUser });
+      } catch (err) {
+        return res.status(500).json({ message: 'Server error adding favorite', data: err.message });
+      }
+    });
+
+  // DELETE remove favorite recipe (must be before /users/:id to avoid route conflict)
+  router.route('/users/:id/favorites/:recipe_id')
+    .delete(async (req, res) => {
+      const id = req.params.id.trim();
+      const recipe_id = parseInt(req.params.recipe_id);
+      try {
+        // Validate recipe_id
+        if (isNaN(recipe_id)) {
+          return res.status(400).json({ message: 'Invalid recipe_id', data: [] });
+        }
+
+        // Find user
+        const user = await User.findById(id);
+        if (!user) {
+          return res.status(404).json({ message: 'User not found', data: [] });
+        }
+
+        // Find favorite in user's favorites array
+        const favoriteIndex = user.favorites.findIndex(
+          fav => fav.recipe_id === recipe_id
+        );
+
+        if (favoriteIndex === -1) {
+          return res.status(404).json({ message: 'Favorite not found', data: [] });
+        }
+
+        // Remove favorite
+        user.favorites.splice(favoriteIndex, 1);
+        user.updated_at = new Date();
+
+        const savedUser = await user.save();
+        return res.status(200).json({ message: 'Favorite removed', data: savedUser });
+      } catch (err) {
+        return res.status(500).json({ message: 'Server error removing favorite', data: err.message });
       }
     });
 

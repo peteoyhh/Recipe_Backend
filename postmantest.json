@@ -1,0 +1,198 @@
+{
+  "info": {
+    "_postman_id": "dcb514c1-24ef-4b12-8de9-fba7de7aab56",
+    "name": "Recipe Management API Tests (with Mongo IDs)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Recipes",
+      "item": [
+        {
+          "name": "GET all recipes",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/recipes",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "recipes"]
+            }
+          }
+        },
+        {
+          "name": "GET recipe by Mongo _id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/recipes/690d898686d55a95d00dab28",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "recipes", "690d898686d55a95d00dab28"]
+            }
+          }
+        },
+        {
+          "name": "POST new recipe",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Garlic Butter Shrimp\",\n  \"ingredients\": [\"shrimp\", \"butter\", \"garlic\", \"parsley\"],\n  \"instructions\": \"Heat butter and garlic, add shrimp until pink.\",\n  \"imageName\": \"garlic-butter-shrimp\",\n  \"extractedIngredients\": [\"shrimp\", \"butter\", \"garlic\", \"parsley\"]\n}"
+            },
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/recipes",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "recipes"]
+            }
+          }
+        },
+        {
+          "name": "PUT update recipe",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Crispy Salt and Pepper Potatoes (Updated)\",\n  \"ingredients\": [\"egg\", \"salt\", \"black pepper\"],\n  \"instructions\": \"Mix all and bake at 400°F for 25 mins\"\n}"
+            },
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/recipes/690d898686d55a95d00dab28",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "recipes", "690d898686d55a95d00dab28"]
+            }
+          }
+        },
+        {
+          "name": "DELETE recipe by Mongo _id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/recipes/690d898686d55a95d00dab28",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "recipes", "690d898686d55a95d00dab28"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "GET all users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/users",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "users"]
+            }
+          }
+        },
+        {
+          "name": "GET user by Mongo _id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/users/690d9a1a686d1ca46f76f242",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "users", "690d9a1a686d1ca46f76f242"]
+            }
+          }
+        },
+        {
+          "name": "POST new user",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"David Lee\",\n  \"email\": \"dlee@example.com\",\n  \"password\": \"123456\",\n  \"favorites\": [],\n  \"created_at\": \"2025-11-07T10:00:00Z\",\n  \"updated_at\": \"2025-11-07T10:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/users",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "users"]
+            }
+          }
+        },
+        {
+          "name": "PUT update user (add favorites)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"favorites\": [\"690d898686d55a95d00dab28\"]\n}"
+            },
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/users/690d9a1a686d1ca46f76f242",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "users", "690d9a1a686d1ca46f76f242"]
+            }
+          }
+        },
+        {
+          "name": "DELETE user by Mongo _id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/users/690d9a1a686d1ca46f76f242",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "users", "690d9a1a686d1ca46f76f242"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Favorites",
+      "item": [
+        {
+          "name": "POST add favorite recipe to user",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipeId\": \"690d898686d55a95d00dab28\"\n}"
+            },
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/users/690d9a1a686d1ca46f76f242/favorites",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "users", "690d9a1a686d1ca46f76f242", "favorites"]
+            }
+          }
+        },
+        {
+          "name": "DELETE remove favorite recipe from user",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipeId\": \"690d898686d55a95d00dab28\"\n}"
+            },
+            "url": {
+              "raw": "https://recipebackend-production-dc03.up.railway.app/api/users/690d9a1a686d1ca46f76f242/favorites",
+              "protocol": "https",
+              "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+              "path": ["api", "users", "690d9a1a686d1ca46f76f242", "favorites"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
