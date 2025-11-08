@@ -26,29 +26,13 @@ module.exports = function (router) {
     // POST create new user
     .post(async (req, res) => {
       try {
-        const { id, username, email, password, favorites } = req.body;
-        if (!username || !email || !password)
-          return res.status(400).json({ message: 'Username, email, and password are required', data: [] });
+        const { username, email, password, favorites } = req.body;
+        if (!username || !email)
+          return res.status(400).json({ message: 'Username and email are required', data: [] });
 
-        // Check if id is provided, if not generate one
-        let userId = id;
-        if (!userId) {
-          // Generate a simple ID if not provided (e.g., "u001", "u002")
-          const lastUser = await User.findOne().sort({ id: -1 });
-          if (lastUser && lastUser.id) {
-            const lastNum = parseInt(lastUser.id.replace('u', '')) || 0;
-            userId = `u${String(lastNum + 1).padStart(3, '0')}`;
-          } else {
-            userId = 'u001';
-          }
-        }
-
-        // Check for duplicate id or email
-        const existingId = await User.findOne({ id: userId });
-        if (existingId)
-          return res.status(400).json({ message: 'User ID already exists', data: [] });
-
-        const existingEmail = await User.findOne({ email: email.toLowerCase() });
+        const normalizedEmail = email.toLowerCase().trim();
+        // Check for duplicate email
+        const existingEmail = await User.findOne({ email: normalizedEmail });
         if (existingEmail)
           return res.status(400).json({ message: 'Email already exists', data: [] });
 
@@ -56,19 +40,15 @@ module.exports = function (router) {
         let validFavorites = [];
         if (Array.isArray(favorites)) {
           validFavorites = favorites.filter(fav => 
-            fav && typeof fav.recipe_id === 'number' && fav.title && fav.saved_at
+            fav && typeof fav.recipe_id === 'string' && mongoose.Types.ObjectId.isValid(fav.recipe_id) && fav.title && fav.saved_at
           );
         }
 
-        const now = new Date();
         const newUser = new User({
-          id: userId,
           username,
-          email: email.toLowerCase(),
-          password,
-          favorites: validFavorites,
-          created_at: now,
-          updated_at: now
+          email: normalizedEmail,
+          ...(password && { password }), // Only include password if provided
+          favorites: validFavorites
         });
 
         const savedUser = await newUser.save();
@@ -78,20 +58,65 @@ module.exports = function (router) {
       }
     });
 
-  // Helper function to find recipe by MongoDB _id or numeric id
+  // Helper functions for favorites operations
+  function validateObjectId(id, errorMessage = 'Invalid ObjectId format') {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return { error: true, message: errorMessage };
+    }
+    return { error: false };
+  }
+
+  async function findUserById(userId) {
+    return await User.findById(userId);
+  }
+
   async function findRecipeById(recipeId) {
-    // Try MongoDB ObjectId first
-    if (mongoose.Types.ObjectId.isValid(recipeId)) {
-      const recipeById = await Recipe.findById(recipeId);
-      if (recipeById) return recipeById;
+    if (!mongoose.Types.ObjectId.isValid(recipeId)) {
+      return null;
     }
-    // Try numeric id
-    const numericId = parseInt(recipeId);
-    if (!isNaN(numericId)) {
-      const recipeByNumericId = await Recipe.findOne({ id: numericId });
-      if (recipeByNumericId) return recipeByNumericId;
+    return await Recipe.findById(recipeId);
+  }
+
+  function isRecipeFavorited(user, recipeObjectId) {
+    // Optimized: use some() for existence check, ensure string comparison
+    const recipeIdStr = String(recipeObjectId);
+    return user.favorites.some(fav => String(fav.recipe_id) === recipeIdStr);
+  }
+
+  function createFavoriteObject(recipe, title = null) {
+    return {
+      recipe_id: recipe._id.toString(),
+      title: title || recipe.title,
+      saved_at: new Date()
+    };
+  }
+
+  async function validateAndFindResources(userId, recipeId) {
+    // Validate user id format
+    const userValidation = validateObjectId(userId, 'Invalid user id format. Must be a valid MongoDB ObjectId');
+    if (userValidation.error) {
+      return { error: true, status: 400, message: userValidation.message };
     }
-    return null;
+
+    // Validate recipe_id format
+    const recipeValidation = validateObjectId(recipeId, 'Invalid recipe_id format. Must be a valid MongoDB ObjectId');
+    if (recipeValidation.error) {
+      return { error: true, status: 400, message: recipeValidation.message };
+    }
+
+    // Find user
+    const user = await findUserById(userId);
+    if (!user) {
+      return { error: true, status: 404, message: 'User not found' };
+    }
+
+    // Find recipe
+    const recipe = await findRecipeById(recipeId);
+    if (!recipe) {
+      return { error: true, status: 404, message: 'Recipe not found' };
+    }
+
+    return { error: false, user, recipe };
   }
 
   // POST/DELETE favorite recipe via URL parameter (must be before /users/:id/favorites)
@@ -99,42 +124,57 @@ module.exports = function (router) {
     .post(async (req, res) => {
       const id = req.params.id.trim();
       const recipe_id_param = req.params.recipe_id.trim();
+
+      const userValidation = validateObjectId(id, 'Invalid user id format. Must be a valid MongoDB ObjectId');
+      if (userValidation.error) {
+        return res.status(400).json({ message: userValidation.message, data: [] });
+      }
+
       try {
-        // Find user
-        const user = await User.findById(id);
-        if (!user) {
-          return res.status(404).json({ message: 'User not found', data: [] });
+        // Validate recipe_id format
+        const recipeValidation = validateObjectId(recipe_id_param, 'Invalid recipe_id format. Must be a valid MongoDB ObjectId');
+        if (recipeValidation.error) {
+          return res.status(400).json({ message: recipeValidation.message, data: [] });
         }
 
-        // Find recipe by MongoDB _id or numeric id
+        // Find recipe
         const recipe = await findRecipeById(recipe_id_param);
         if (!recipe) {
           return res.status(404).json({ message: 'Recipe not found', data: [] });
         }
 
-        // Use recipe's numeric id for favorites (consistent with schema)
-        const recipeNumericId = recipe.id;
-        const recipeTitle = recipe.title;
+        const recipeObjectId = recipe._id.toString();
+        const newFavorite = createFavoriteObject(recipe);
 
-        // Check if already favorited (by numeric id)
-        const existingFavorite = user.favorites.find(
-          fav => fav.recipe_id === recipeNumericId
+        // Check if already favorited and add in one operation using findOneAndUpdate
+        // Mongoose timestamps will automatically update updated_at
+        const updatedUser = await User.findOneAndUpdate(
+          {
+            _id: id,
+            'favorites.recipe_id': { $ne: recipeObjectId } // Only update if not already favorited
+          },
+          {
+            $push: { favorites: newFavorite }
+          },
+          {
+            new: true, // Return updated document
+            runValidators: true
+          }
         );
-        if (existingFavorite) {
-          return res.status(400).json({ message: 'Recipe already in favorites', data: [] });
+
+        if (!updatedUser) {
+          // Either user not found or already favorited - check which one
+          const user = await findUserById(id);
+          if (!user) {
+            return res.status(404).json({ message: 'User not found', data: [] });
+          }
+          if (isRecipeFavorited(user, recipeObjectId)) {
+            return res.status(400).json({ message: 'Recipe already in favorites', data: [] });
+          }
+          return res.status(404).json({ message: 'User not found', data: [] });
         }
 
-        // Add to favorites
-        const newFavorite = {
-          recipe_id: recipeNumericId,
-          title: recipeTitle,
-          saved_at: new Date()
-        };
-        user.favorites.push(newFavorite);
-        user.updated_at = new Date();
-
-        const savedUser = await user.save();
-        return res.status(201).json({ message: 'Favorite added', data: savedUser });
+        return res.status(201).json({ message: 'Favorite added', data: updatedUser });
       } catch (err) {
         return res.status(500).json({ message: 'Server error adding favorite', data: err.message });
       }
@@ -142,37 +182,56 @@ module.exports = function (router) {
     .delete(async (req, res) => {
       const id = req.params.id.trim();
       const recipe_id_param = req.params.recipe_id.trim();
+
+      const userValidation = validateObjectId(id, 'Invalid user id format. Must be a valid MongoDB ObjectId');
+      if (userValidation.error) {
+        return res.status(400).json({ message: userValidation.message, data: [] });
+      }
+
       try {
-        // Find user
-        const user = await User.findById(id);
-        if (!user) {
-          return res.status(404).json({ message: 'User not found', data: [] });
+        // Validate recipe_id format
+        const recipeValidation = validateObjectId(recipe_id_param, 'Invalid recipe_id format. Must be a valid MongoDB ObjectId');
+        if (recipeValidation.error) {
+          return res.status(400).json({ message: recipeValidation.message, data: [] });
         }
 
-        // Find recipe by MongoDB _id or numeric id to get the numeric id
+        // Find recipe to get ObjectId
         const recipe = await findRecipeById(recipe_id_param);
         if (!recipe) {
           return res.status(404).json({ message: 'Recipe not found', data: [] });
         }
 
-        // Use recipe's numeric id to find in favorites
-        const recipeNumericId = recipe.id;
+        const recipeObjectId = recipe._id.toString();
 
-        // Find favorite in user's favorites array by numeric id
-        const favoriteIndex = user.favorites.findIndex(
-          fav => fav.recipe_id === recipeNumericId
+        // Remove favorite using findOneAndUpdate
+        // Mongoose timestamps will automatically update updated_at
+        const updatedUser = await User.findOneAndUpdate(
+          {
+            _id: id,
+            'favorites.recipe_id': recipeObjectId // Only update if favorite exists
+          },
+          {
+            $pull: { favorites: { recipe_id: recipeObjectId } }
+          },
+          {
+            new: true, // Return updated document
+            runValidators: true
+          }
         );
 
-        if (favoriteIndex === -1) {
-          return res.status(404).json({ message: 'Favorite not found', data: [] });
+        if (!updatedUser) {
+          // Either user not found or favorite not found - check which one
+          const user = await findUserById(id);
+          if (!user) {
+            return res.status(404).json({ message: 'User not found', data: [] });
+          }
+          if (!isRecipeFavorited(user, recipeObjectId)) {
+            return res.status(404).json({ message: 'Favorite not found', data: [] });
+          }
+          return res.status(404).json({ message: 'User not found', data: [] });
         }
 
-        // Remove favorite
-        user.favorites.splice(favoriteIndex, 1);
-        user.updated_at = new Date();
-
-        const savedUser = await user.save();
-        return res.status(200).json({ message: 'Favorite removed', data: savedUser });
+        return res.status(200).json({ message: 'Favorite removed', data: updatedUser });
       } catch (err) {
         return res.status(500).json({ message: 'Server error removing favorite', data: err.message });
       }
@@ -183,48 +242,63 @@ module.exports = function (router) {
     .post(async (req, res) => {
       const id = req.params.id.trim();
       try {
-        const { recipe_id, title } = req.body;
+        const userValidation = validateObjectId(id, 'Invalid user id format. Must be a valid MongoDB ObjectId');
+        if (userValidation.error) {
+          return res.status(400).json({ message: userValidation.message, data: [] });
+        }
 
-        // Validate recipe_id
-        if (recipe_id === undefined || recipe_id === null) {
+        const { recipe_id, recipeId, title = null } = req.body;
+        const incomingRecipeId = (recipe_id ?? recipeId);
+
+        // Validate recipe id presence
+        if (incomingRecipeId === undefined || incomingRecipeId === null) {
           return res.status(400).json({ message: 'recipe_id is required', data: [] });
         }
 
-        // Find user
-        const user = await User.findById(id);
-        if (!user) {
-          return res.status(404).json({ message: 'User not found', data: [] });
+        // Validate recipe_id format
+        const recipeValidation = validateObjectId(String(incomingRecipeId).trim(), 'Invalid recipe_id format. Must be a valid MongoDB ObjectId');
+        if (recipeValidation.error) {
+          return res.status(400).json({ message: recipeValidation.message, data: [] });
         }
 
-        // Find recipe by MongoDB _id or numeric id
-        const recipe = await findRecipeById(recipe_id);
+        // Find recipe
+        const recipe = await findRecipeById(String(incomingRecipeId).trim());
         if (!recipe) {
           return res.status(404).json({ message: 'Recipe not found', data: [] });
         }
 
-        // Use recipe's numeric id for favorites (consistent with schema)
-        const recipeNumericId = recipe.id;
-        const recipeTitle = title || recipe.title;
+        const recipeObjectId = String(recipe._id);
+        const newFavorite = createFavoriteObject(recipe, title);
 
-        // Check if already favorited (by numeric id)
-        const existingFavorite = user.favorites.find(
-          fav => fav.recipe_id === recipeNumericId
+        // Check if already favorited and add in one operation using findOneAndUpdate
+        // Mongoose timestamps will automatically update updated_at
+        const updatedUser = await User.findOneAndUpdate(
+          {
+            _id: id,
+            'favorites.recipe_id': { $ne: recipeObjectId } // Only update if not already favorited
+          },
+          {
+            $push: { favorites: newFavorite }
+          },
+          {
+            new: true, // Return updated document
+            runValidators: true
+          }
         );
-        if (existingFavorite) {
-          return res.status(400).json({ message: 'Recipe already in favorites', data: [] });
+
+        if (!updatedUser) {
+          // Either user not found or already favorited - check which one
+          const user = await findUserById(id);
+          if (!user) {
+            return res.status(404).json({ message: 'User not found', data: [] });
+          }
+          if (isRecipeFavorited(user, recipeObjectId)) {
+            return res.status(400).json({ message: 'Recipe already in favorites', data: [] });
+          }
+          return res.status(404).json({ message: 'User not found', data: [] });
         }
 
-        // Add to favorites
-        const newFavorite = {
-          recipe_id: recipeNumericId,
-          title: recipeTitle,
-          saved_at: new Date()
-        };
-        user.favorites.push(newFavorite);
-        user.updated_at = new Date();
-
-        const savedUser = await user.save();
-        return res.status(201).json({ message: 'Favorite added', data: savedUser });
+        return res.status(201).json({ message: 'Favorite added', data: updatedUser });
       } catch (err) {
         return res.status(500).json({ message: 'Server error adding favorite', data: err.message });
       }
@@ -236,6 +310,11 @@ module.exports = function (router) {
     .get(async (req, res) => {
       const id = req.params.id.trim();
       try {
+        const userValidation = validateObjectId(id, 'Invalid user id format. Must be a valid MongoDB ObjectId');
+        if (userValidation.error) {
+          return res.status(400).json({ message: userValidation.message, data: [] });
+        }
+
         const select = req.query.select ? JSON.parse(req.query.select) : null;
         const user = await User.findById(id, select || undefined).lean();
     
@@ -245,7 +324,6 @@ module.exports = function (router) {
         // enforce field order for response
         const orderedUser = {
           _id: user._id,
-          id: user.id,
           username: user.username,
           email: user.email,
           password: user.password,
@@ -263,43 +341,61 @@ module.exports = function (router) {
     .put(async (req, res) => {
       const id = req.params.id.trim();
       try {
+        const userValidation = validateObjectId(id, 'Invalid user id format. Must be a valid MongoDB ObjectId');
+        if (userValidation.error) {
+          return res.status(400).json({ message: userValidation.message, data: [] });
+        }
+
         const { username, email, password, favorites } = req.body;
         if (!username || !email)
           return res.status(400).json({ message: 'Username and email are required', data: [] });
 
-        const user = await User.findById(id);
-        if (!user)
-          return res.status(404).json({ message: 'User not found', data: [] });
+        const normalizedEmail = email.toLowerCase().trim();
 
-        // Check for email conflict
-        const conflict = await User.findOne({ email: email.toLowerCase(), _id: { $ne: user._id } });
+        // Check for email conflict (need to check before update)
+        const conflict = await User.findOne({ email: normalizedEmail, _id: { $ne: id } });
         if (conflict)
           return res.status(400).json({ message: 'Email already exists', data: [] });
 
-        // Update fields
-        user.username = username;
-        user.email = email.toLowerCase();
+        // Build update object
+        // Mongoose timestamps will automatically update updated_at
+        const updateFields = {
+          username,
+          email: normalizedEmail
+        };
+
+        // Add password if provided
         if (password) {
-          user.password = password;
+          updateFields.password = password;
         }
 
         // Validate and update favorites if provided
         if (favorites !== undefined) {
           if (Array.isArray(favorites)) {
-            // Filter and validate favorites structure
-            user.favorites = favorites.filter(fav => 
-              fav && typeof fav.recipe_id === 'number' && fav.title && fav.saved_at
+            // Filter and validate favorites structure (recipe_id must be valid ObjectId string)
+            updateFields.favorites = favorites.filter(fav => 
+              fav && typeof fav.recipe_id === 'string' && mongoose.Types.ObjectId.isValid(fav.recipe_id) && fav.title && fav.saved_at
             );
           } else {
-            user.favorites = [];
+            updateFields.favorites = [];
           }
         }
 
-        // Update timestamp
-        user.updated_at = new Date();
+        // Update user using findOneAndUpdate
+        const updatedUser = await User.findOneAndUpdate(
+          { _id: id },
+          { $set: updateFields },
+          {
+            new: true, // Return updated document
+            runValidators: true
+          }
+        );
 
-        const savedUser = await user.save();
-        return res.status(200).json({ message: 'User updated', data: savedUser });
+        if (!updatedUser) {
+          return res.status(404).json({ message: 'User not found', data: [] });
+        }
+
+        return res.status(200).json({ message: 'User updated', data: updatedUser });
       } catch (err) {
         return res.status(500).json({ message: 'Server error updating user', data: err.message });
       }
@@ -308,7 +404,12 @@ module.exports = function (router) {
     .delete(async (req, res) => {
       const id = req.params.id.trim();
       try {
-        const user = await User.findById(id);
+        const userValidation = validateObjectId(id, 'Invalid user id format. Must be a valid MongoDB ObjectId');
+        if (userValidation.error) {
+          return res.status(400).json({ message: userValidation.message, data: [] });
+        }
+
+        const user = await findUserById(id);
         if (!user)
           return res.status(404).json({ message: 'User not found', data: [] });
 
