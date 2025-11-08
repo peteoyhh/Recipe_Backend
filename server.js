@@ -17,9 +17,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 // Connect to MongoDB
+// IMPORTANT: Never hardcode MongoDB URI. Always use environment variables.
 const mongoURI = process.env.MONGODB_URI;
-if (!mongoURI) {
+if (!mongoURI || mongoURI.trim() === '') {
   console.error('❌ No MongoDB connection string found in .env (MONGODB_URI)');
+  console.error('   Please set MONGODB_URI in your .env file');
   process.exit(1);
 }
 
