@@ -27,7 +27,8 @@ if (!mongoURI || mongoURI.trim() === '') {
 
 mongoose.connect(mongoURI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
+  useCreateIndex: true  // Use createIndex instead of deprecated ensureIndex
 })
   .then(() => console.log('✅ Connected to MongoDB'))
   .catch((err) => console.error('❌ MongoDB connection error:', err));
