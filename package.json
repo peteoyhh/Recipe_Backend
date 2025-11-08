@@ -1,0 +1,41 @@
+{
+  "name": "mp3_starter",
+  "version": "1.0.0",
+  "description": "MP3 Starter for CS409 Fall 2025",
+  "authors": [
+    "Arjun Sivaraman <arjun16@illinois.edu>",
+    "Tianyi Zhong <tzhong8@illinois.edu>",
+    "James Lee <jwlee11@illinois.edu>",
+    "Sujay Khandekar <khandek2@illinois.edu>"
+  ],
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon --exec node server.js"
+  },
+  "babel": {
+    "presets": [
+      "env",
+      "react"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cs409-fa25/mp3.git"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "mongoose": "^5.13.23",
+    "nodemon": "^1.11.0"
+  },
+  "main": "server.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cs409-fa25/mp3/issues"
+  },
+  "homepage": "https://github.com/cs409-fa25/mp3#readme"
+}
