@@ -1,0 +1,57 @@
+{
+  "info": {
+    "_postman_id": "f1ae9a17-3b14-4c2d-9b47-7ef23245fa24",
+    "name": "Favorites (updated with new IDs)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "POST add favorite recipe to user",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"recipeId\": \"690d898686d55a95d00dab29\"\n}"
+        },
+        "url": {
+          "raw": "https://recipebackend-production-dc03.up.railway.app/api/users/690d9a1a686d1ca46f76f243/favorites",
+          "protocol": "https",
+          "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+          "path": [
+            "api",
+            "users",
+            "690d9a1a686d1ca46f76f243",
+            "favorites"
+          ]
+        }
+      }
+    },
+    {
+      "name": "DELETE remove favorite recipe from user",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"recipeId\": \"690d898686d55a95d00dab29\"\n}"
+        },
+        "url": {
+          "raw": "https://recipebackend-production-dc03.up.railway.app/api/users/690d9a1a686d1ca46f76f243/favorites",
+          "protocol": "https",
+          "host": ["recipebackend-production-dc03", "up", "railway", "app"],
+          "path": [
+            "api",
+            "users",
+            "690d9a1a686d1ca46f76f243",
+            "favorites"
+          ]
+        }
+      }
+    }
+  ]
+}

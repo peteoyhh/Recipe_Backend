@@ -78,7 +78,107 @@ module.exports = function (router) {
       }
     });
 
-  // POST add favorite recipe (must be before /users/:id to avoid route conflict)
+  // Helper function to find recipe by MongoDB _id or numeric id
+  async function findRecipeById(recipeId) {
+    // Try MongoDB ObjectId first
+    if (mongoose.Types.ObjectId.isValid(recipeId)) {
+      const recipeById = await Recipe.findById(recipeId);
+      if (recipeById) return recipeById;
+    }
+    // Try numeric id
+    const numericId = parseInt(recipeId);
+    if (!isNaN(numericId)) {
+      const recipeByNumericId = await Recipe.findOne({ id: numericId });
+      if (recipeByNumericId) return recipeByNumericId;
+    }
+    return null;
+  }
+
+  // POST/DELETE favorite recipe via URL parameter (must be before /users/:id/favorites)
+  router.route('/users/:id/favorites/:recipe_id')
+    .post(async (req, res) => {
+      const id = req.params.id.trim();
+      const recipe_id_param = req.params.recipe_id.trim();
+      try {
+        // Find user
+        const user = await User.findById(id);
+        if (!user) {
+          return res.status(404).json({ message: 'User not found', data: [] });
+        }
+
+        // Find recipe by MongoDB _id or numeric id
+        const recipe = await findRecipeById(recipe_id_param);
+        if (!recipe) {
+          return res.status(404).json({ message: 'Recipe not found', data: [] });
+        }
+
+        // Use recipe's numeric id for favorites (consistent with schema)
+        const recipeNumericId = recipe.id;
+        const recipeTitle = recipe.title;
+
+        // Check if already favorited (by numeric id)
+        const existingFavorite = user.favorites.find(
+          fav => fav.recipe_id === recipeNumericId
+        );
+        if (existingFavorite) {
+          return res.status(400).json({ message: 'Recipe already in favorites', data: [] });
+        }
+
+        // Add to favorites
+        const newFavorite = {
+          recipe_id: recipeNumericId,
+          title: recipeTitle,
+          saved_at: new Date()
+        };
+        user.favorites.push(newFavorite);
+        user.updated_at = new Date();
+
+        const savedUser = await user.save();
+        return res.status(201).json({ message: 'Favorite added', data: savedUser });
+      } catch (err) {
+        return res.status(500).json({ message: 'Server error adding favorite', data: err.message });
+      }
+    })
+    .delete(async (req, res) => {
+      const id = req.params.id.trim();
+      const recipe_id_param = req.params.recipe_id.trim();
+      try {
+        // Find user
+        const user = await User.findById(id);
+        if (!user) {
+          return res.status(404).json({ message: 'User not found', data: [] });
+        }
+
+        // Find recipe by MongoDB _id or numeric id to get the numeric id
+        const recipe = await findRecipeById(recipe_id_param);
+        if (!recipe) {
+          return res.status(404).json({ message: 'Recipe not found', data: [] });
+        }
+
+        // Use recipe's numeric id to find in favorites
+        const recipeNumericId = recipe.id;
+
+        // Find favorite in user's favorites array by numeric id
+        const favoriteIndex = user.favorites.findIndex(
+          fav => fav.recipe_id === recipeNumericId
+        );
+
+        if (favoriteIndex === -1) {
+          return res.status(404).json({ message: 'Favorite not found', data: [] });
+        }
+
+        // Remove favorite
+        user.favorites.splice(favoriteIndex, 1);
+        user.updated_at = new Date();
+
+        const savedUser = await user.save();
+        return res.status(200).json({ message: 'Favorite removed', data: savedUser });
+      } catch (err) {
+        return res.status(500).json({ message: 'Server error removing favorite', data: err.message });
+      }
+    });
+
+  // POST add favorite recipe via body (must be before /users/:id to avoid route conflict)
   router.route('/users/:id/favorites')
     .post(async (req, res) => {
       const id = req.params.id.trim();
@@ -96,18 +196,19 @@ module.exports = function (router) {
           return res.status(404).json({ message: 'User not found', data: [] });
         }
 
-        // Find recipe to get title if not provided
-        const recipe = await Recipe.findOne({ id: recipe_id });
+        // Find recipe by MongoDB _id or numeric id
+        const recipe = await findRecipeById(recipe_id);
         if (!recipe) {
           return res.status(404).json({ message: 'Recipe not found', data: [] });
         }
 
-        // Use provided title or recipe title
+        // Use recipe's numeric id for favorites (consistent with schema)
+        const recipeNumericId = recipe.id;
         const recipeTitle = title || recipe.title;
 
-        // Check if already favorited
+        // Check if already favorited (by numeric id)
         const existingFavorite = user.favorites.find(
-          fav => fav.recipe_id === recipe_id
+          fav => fav.recipe_id === recipeNumericId
         );
         if (existingFavorite) {
           return res.status(400).json({ message: 'Recipe already in favorites', data: [] });
@@ -115,7 +216,7 @@ module.exports = function (router) {
 
         // Add to favorites
         const newFavorite = {
-          recipe_id: recipe_id,
+          recipe_id: recipeNumericId,
           title: recipeTitle,
           saved_at: new Date()
         };
@@ -129,42 +230,6 @@ module.exports = function (router) {
       }
     });
 
-  // DELETE remove favorite recipe (must be before /users/:id to avoid route conflict)
-  router.route('/users/:id/favorites/:recipe_id')
-    .delete(async (req, res) => {
-      const id = req.params.id.trim();
-      const recipe_id = parseInt(req.params.recipe_id);
-      try {
-        // Validate recipe_id
-        if (isNaN(recipe_id)) {
-          return res.status(400).json({ message: 'Invalid recipe_id', data: [] });
-        }
-
-        // Find user
-        const user = await User.findById(id);
-        if (!user) {
-          return res.status(404).json({ message: 'User not found', data: [] });
-        }
-
-        // Find favorite in user's favorites array
-        const favoriteIndex = user.favorites.findIndex(
-          fav => fav.recipe_id === recipe_id
-        );
-
-        if (favoriteIndex === -1) {
-          return res.status(404).json({ message: 'Favorite not found', data: [] });
-        }
-
-        // Remove favorite
-        user.favorites.splice(favoriteIndex, 1);
-        user.updated_at = new Date();
-
-        const savedUser = await user.save();
-        return res.status(200).json({ message: 'Favorite removed', data: savedUser });
-      } catch (err) {
-        return res.status(500).json({ message: 'Server error removing favorite', data: err.message });
-      }
-    });
 
   // GET / PUT / DELETE by id
   router.route('/users/:id')
