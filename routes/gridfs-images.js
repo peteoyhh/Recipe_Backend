@@ -3,13 +3,12 @@
 
 const mongoose = require('mongoose');
 const multer = require('multer');
-const { GridFSBucket } = require('mongodb');
 
 let bucket;
 
 // 初始化 GridFS bucket
 mongoose.connection.once('open', () => {
-  bucket = new GridFSBucket(mongoose.connection.db, {
+  bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
     bucketName: 'recipeImages'
   });
   console.log('✅ GridFS bucket initialized for recipe images');
