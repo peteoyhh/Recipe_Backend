@@ -16,8 +16,9 @@ The API supports CRUD operations for both **Users** and **Recipes**, complete wi
 
 ## Deployment
 
-- **Render URL:** [https://mp3-xc74.onrender.com](https://mp3-xc74.onrender.com)
+- **Railway URL:** [https://recipebackend-production-dc03.up.railway.app](https://recipebackend-production-dc03.up.railway.app)
 - **MongoDB Atlas Cluster:** Connected remotely (IP Whitelist: Allow access from anywhere)
+- **Image Storage:** MongoDB GridFS (13,582 images stored in cloud)
 
 ---
 
@@ -40,6 +41,14 @@ The API supports CRUD operations for both **Users** and **Recipes**, complete wi
 | GET | `/api/recipes/:id` | Get details of a specific recipe (by MongoDB `_id`) |
 | PUT | `/api/recipes/:id` | Update recipe fields |
 | DELETE | `/api/recipes/:id` | Delete recipe |
+
+### 📸 Recipe Images (MongoDB GridFS)
+| Method | Endpoint | Description |
+|---------|-----------|-------------|
+| GET | `/api/gridfs-images/:imageName` | Get recipe image from MongoDB GridFS (public access) |
+| GET | `/api/gridfs-images` | List all stored images (up to 100) |
+| POST | `/api/gridfs-images/upload` | Upload single image (requires authentication) |
+| POST | `/api/gridfs-images/batch-upload` | Upload multiple images (requires authentication) |
 
 ---
 
@@ -156,8 +165,9 @@ Example (GET `/api/users/:id`):
 - **Express**
 - **MongoDB Atlas**
 - **Mongoose**
-- **Render** (deployment)
-- **Postman** (testing)
+- **MongoDB GridFS** (for image storage)
+- **Multer** (for file uploads)
+- **Railway** (deployment - updated from Render)
 
 ---
 
@@ -166,11 +176,20 @@ Example (GET `/api/users/:id`):
   ```
   MONGODB_URI=your_connection_string_here
   PORT=3000
+  UPLOAD_TOKEN=recipe-upload-secret-2024  # For image upload authentication
   ```
 - `.env` is listed in `.gitignore` to prevent accidental exposure.
 - Recipe queries default to a limit of 100 results to prevent overwhelming responses.
 - User IDs are auto-generated in format `u001`, `u002`, etc. if not provided.
 - Recipe IDs are auto-generated as numeric values (0, 1, 2, etc.) if not provided.
+
+### Image Storage
+- **All 13,582 recipe images** are stored in **MongoDB GridFS** (cloud-based storage)
+- Images are served through `/api/gridfs-images/:imageName` endpoint
+- Recipe documents include `imageName` field (e.g., "chicken-recipe") and auto-generated `imageUrl` field
+- Each recipe automatically gets a full `imageUrl` when fetched from the API
+- Image uploads require Bearer Token authentication for security
+- Public image access does not require authentication
 
 ---
 

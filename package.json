@@ -23,11 +23,14 @@
     "url": "git+https://github.com/cs409-fa25/mp3.git"
   },
   "dependencies": {
+    "axios": "^1.6.0",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "form-data": "^4.0.0",
     "mongoose": "^5.13.23",
+    "multer": "^1.4.5-lts.1",
     "nodemon": "^1.11.0"
   },
   "main": "server.js",
