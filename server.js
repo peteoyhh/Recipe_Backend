@@ -30,7 +30,10 @@ mongoose.connect(mongoURI, {
   useUnifiedTopology: true,
   useCreateIndex: true  // Use createIndex instead of deprecated ensureIndex
 })
-  .then(() => console.log('✅ Connected to MongoDB'))
+  .then(() => {
+    console.log('✅ Connected to MongoDB');
+    console.log('✅ GridFS ready for image storage');
+  })
   .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // Import routes
