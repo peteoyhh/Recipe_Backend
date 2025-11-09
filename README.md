@@ -42,6 +42,29 @@ The API supports CRUD operations for both **Users** and **Recipes**, complete wi
 | PUT | `/api/recipes/:id` | Update recipe fields |
 | DELETE | `/api/recipes/:id` | Delete recipe |
 
+### 🔐 Authentication
+| Method | Endpoint | Description |
+|---------|-----------|-------------|
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Login and get JWT token |
+| GET | `/api/auth/me` | Get current user info (requires auth) |
+
+### ❤️ User Favorites
+| Method | Endpoint | Description |
+|---------|-----------|-------------|
+| GET | `/api/favorites` | Get user's favorite recipes (requires auth) |
+| POST | `/api/favorites/:recipeId` | Add recipe to favorites (requires auth) |
+| DELETE | `/api/favorites/:recipeId` | Remove from favorites (requires auth) |
+| GET | `/api/favorites/check/:recipeId` | Check if recipe is favorited (requires auth) |
+
+### 📝 User Created Recipes
+| Method | Endpoint | Description |
+|---------|-----------|-------------|
+| GET | `/api/user-recipes` | Get recipes created by current user (requires auth) |
+| POST | `/api/user-recipes` | Create new recipe (requires auth) |
+| PUT | `/api/user-recipes/:recipeId` | Update user's recipe (requires auth) |
+| DELETE | `/api/user-recipes/:recipeId` | Delete user's recipe (requires auth) |
+
 ### 📸 Recipe Images (MongoDB GridFS)
 | Method | Endpoint | Description |
 |---------|-----------|-------------|
@@ -167,6 +190,8 @@ Example (GET `/api/users/:id`):
 - **Mongoose**
 - **MongoDB GridFS** (for image storage)
 - **Multer** (for file uploads)
+- **JWT** (user authentication)
+- **bcryptjs** (password hashing)
 - **Railway** (deployment - updated from Render)
 
 ---
@@ -176,12 +201,15 @@ Example (GET `/api/users/:id`):
   ```
   MONGODB_URI=your_connection_string_here
   PORT=3000
+  JWT_SECRET=your_jwt_secret_here
   UPLOAD_TOKEN=recipe-upload-secret-2024  # For image upload authentication
   ```
 - `.env` is listed in `.gitignore` to prevent accidental exposure.
 - Recipe queries default to a limit of 100 results to prevent overwhelming responses.
 - User IDs are auto-generated in format `u001`, `u002`, etc. if not provided.
 - Recipe IDs are auto-generated as numeric values (0, 1, 2, etc.) if not provided.
+- **User authentication** uses JWT tokens with bcrypt password hashing
+- **Protected routes** require `Authorization: Bearer <token>` header
 
 ### Image Storage
 - **All 13,582 recipe images** are stored in **MongoDB GridFS** (cloud-based storage)
