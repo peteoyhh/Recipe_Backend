@@ -1,5 +1,4 @@
 // scripts/fix-user-ids.js
-// 修复数据库中 id = null 的用户，为他们生成唯一的 id
 
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -7,28 +6,25 @@ const User = require('../models/user');
 
 async function fixUserIds() {
   try {
-    // 连接数据库
-    console.log('正在连接数据库...');
+    console.log('connecting...');
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('数据库连接成功！\n');
+    console.log('connection sucessful\n');
 
-    // 查找所有没有 id 或 id 为 null 的用户
     const usersWithoutId = await User.find({
       $or: [
         { id: null },
         { id: { $exists: false } }
       ]
-    }).sort({ createdAt: 1 });  // 按创建时间排序
+    }).sort({ createdAt: 1 });  
 
-    console.log(`找到 ${usersWithoutId.length} 个需要修复的用户\n`);
+    console.log(`found ${usersWithoutId.length} users need fix\n`);
 
     if (usersWithoutId.length === 0) {
-      console.log('没有需要修复的用户！');
+      console.log('no user need fix');
       await mongoose.disconnect();
       return;
     }
 
-    // 查找当前最大的 id 号码
     const lastUserWithId = await User.findOne({ 
       id: { $exists: true, $ne: null } 
     }).sort({ id: -1 });
@@ -41,9 +37,8 @@ async function fixUserIds() {
       }
     }
 
-    console.log(`开始从 u${String(nextNum).padStart(3, '0')} 分配 id...\n`);
+    console.log(`start from u${String(nextNum).padStart(3, '0')} distrbute id...\n`);
 
-    // 为每个用户生成唯一的 id
     let successCount = 0;
     let errorCount = 0;
 
@@ -51,36 +46,33 @@ async function fixUserIds() {
       try {
         const newId = `u${String(nextNum).padStart(3, '0')}`;
         
-        // 直接更新数据库，绕过密码加密中间件
         await User.updateOne(
           { _id: user._id },
           { $set: { id: newId } }
         );
 
-        console.log(`✓ 用户 ${user.username} (${user.email}) 已分配 id: ${newId}`);
+        console.log(`✓ User ${user.username} (${user.email}) assinged to id: ${newId}`);
         nextNum++;
         successCount++;
       } catch (error) {
-        console.error(`✗ 修复用户 ${user.username} 失败:`, error.message);
+        console.error(`✗ fix user ${user.username} failed:`, error.message);
         errorCount++;
       }
     }
 
-    console.log(`\n修复完成！`);
-    console.log(`成功: ${successCount} 个用户`);
-    console.log(`失败: ${errorCount} 个用户`);
+    console.log(`\finished`);
+    console.log(`sucessful: ${successCount} users`);
+    console.log(`failed: ${errorCount} users`);
 
-    // 断开数据库连接
     await mongoose.disconnect();
-    console.log('\n数据库连接已关闭');
+    console.log('\connection to the database failed');
 
   } catch (error) {
-    console.error('发生错误:', error);
+    console.error('error happened:', error);
     await mongoose.disconnect();
     process.exit(1);
   }
 }
 
-// 运行脚本
 fixUserIds();
 
