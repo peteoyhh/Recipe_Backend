@@ -10,7 +10,8 @@
   ],
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon --exec node server.js"
+    "dev": "nodemon --exec node server.js",
+    "fix-user-ids": "node scripts/fix-user-ids.js"
   },
   "babel": {
     "presets": [
