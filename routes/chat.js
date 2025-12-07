@@ -53,7 +53,7 @@ module.exports = function(router) {
         const systemPrompt = `You are a helpful recipe assistant. Your job is to recommend recipes based on user requests. Keep responses short and friendly (max 150 words). If users ask about ingredients or cooking, suggest relevant recipes.`;
 
         const response = await axios.post(
-          `https://api-inference.huggingface.co/models/${HF_MODEL}`,
+          `https://router.huggingface.co/models/${HF_MODEL}`,
           {
             inputs: `${systemPrompt}\n\nUser: ${message}\n\nAssistant:`,
             parameters: {
