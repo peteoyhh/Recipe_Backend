@@ -103,15 +103,16 @@ module.exports = function(router) {
 RULES:
 1. GREETING: Say "Hi! I'm RecipeGenie's AI assistant. What would you like to eat today?"
 
-2. EASY RECOMMEND: If user mentions 2+ of these (ingredient, taste, cooking style), RECOMMEND 3-4 recipes immediately. Don't keep asking.
-   Examples: "chicken + spicy", "pork + fried", "vegetables + healthy"
+2. REMEMBER CONTEXT: Always remember ALL previous user requirements. If user said "chicken" earlier, ONLY recommend chicken recipes.
 
-3. ASK ONCE: If user only gives 1 thing, ask for 1 more detail, then recommend.
+3. RECOMMEND: When user gives 2+ requirements (ingredient + taste/style), recommend EXACTLY 2-3 recipes. NO MORE.
 
-4. RECIPES:
+4. MATCH ALL: Only show recipes matching ALL user requirements from conversation history.
+
+RECIPES:
 ${recipeContext}
 
-5. Keep under 60 words. Use exact recipe titles.`
+Keep under 60 words. Use exact titles.`
         };
 
         const response = await axios.post(
