@@ -1,16 +1,59 @@
-// routes/chat.js - AI Chat API with Hugging Face
-const axios = require('axios');
+// routes/chat.js - AI Chat API with simple recipe assistant
 const { authenticate } = require('../middleware/auth');
 
 // Usage tracking - simple in-memory counter (resets on server restart)
 let globalUsageCount = 0;
-const GLOBAL_LIMIT = 10000; // 1/3 of free tier (30k/month)
+const GLOBAL_LIMIT = 10000;
 const userTotalUsage = new Map(); // userId -> total count
 const USER_TOTAL_LIMIT = 200; // Total messages per user
 
 // Get user total usage count
 function getUserUsageCount(userId) {
   return userTotalUsage.get(userId) || 0;
+}
+
+// Simple rule-based recipe assistant
+function generateRecipeResponse(userMessage) {
+  const msg = userMessage.toLowerCase();
+  
+  // greetings
+  if (msg.match(/^(hi|hello|hey|greetings)/)) {
+    return "Hello! I'm your recipe assistant. I can help you find recipes based on ingredients, dietary preferences, or meal types. What are you looking for today?";
+  }
+  
+  // ingredient-based queries
+  if (msg.includes('chicken')) {
+    return "Great choice! Try searching for 'Grilled Chicken', 'Chicken Curry', or 'Chicken Stir-fry'. Use the ingredient filter to find recipes with chicken!";
+  }
+  if (msg.includes('vegetarian') || msg.includes('vegan')) {
+    return "Looking for plant-based options? Try 'Veggie Buddha Bowl', 'Lentil Soup', or 'Mushroom Risotto'. Filter by vegetables in the gallery view!";
+  }
+  if (msg.includes('pasta')) {
+    return "Pasta lovers unite! Check out 'Carbonara', 'Aglio e Olio', or 'Pesto Pasta'. Browse our pasta recipes in the list view!";
+  }
+  if (msg.includes('dessert') || msg.includes('sweet')) {
+    return "Sweet tooth? Try 'Chocolate Cake', 'Tiramisu', or 'Fruit Tart'. Search for 'dessert' to see all options!";
+  }
+  if (msg.includes('quick') || msg.includes('easy') || msg.includes('fast')) {
+    return "Need something quick? Look for recipes with fewer ingredients in the gallery view. Most pasta and stir-fry dishes are ready in 30 minutes!";
+  }
+  if (msg.includes('healthy')) {
+    return "Healthy eating! Try salads, grilled proteins, or veggie-based dishes. Use the vegetable filter to find nutritious options!";
+  }
+  
+  // meal type queries
+  if (msg.includes('breakfast')) {
+    return "Breakfast ideas: Try searching for 'Pancakes', 'Omelette', or 'Smoothie Bowl'. Start your day right!";
+  }
+  if (msg.includes('lunch')) {
+    return "Lunch suggestions: 'Salad', 'Sandwich', or 'Soup' are great options. Browse the list view for more!";
+  }
+  if (msg.includes('dinner')) {
+    return "Dinner time! Consider 'Roasted Chicken', 'Salmon', or 'Stir-fry'. Check out the gallery for inspiration!";
+  }
+  
+  // default helpful response
+  return "I'm here to help you discover delicious recipes! Try telling me what ingredients you have, or what type of meal you're planning. You can also use the 'Browse Recipes' or 'By Ingredients' buttons to explore!";
 }
 
 module.exports = function(router) {
@@ -46,39 +89,8 @@ module.exports = function(router) {
           });
         }
 
-        // Call Hugging Face API - using text generation
-        const HF_API_KEY = process.env.HUGGINGFACE_API_KEY;
-        
-        // Use a simple, reliable text generation model
-        const HF_MODEL = 'gpt2';
-
-        const prompt = `You are a recipe assistant. User asks: ${message}\n\nAssistant:`;
-
-        const response = await axios.post(
-          `https://router.huggingface.co/models/${HF_MODEL}`,
-          {
-            inputs: prompt,
-            parameters: {
-              max_new_tokens: 100,
-              temperature: 0.7,
-              return_full_text: false
-            }
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${HF_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 30000
-          }
-        );
-
-        let aiResponse = '';
-        if (response.data && Array.isArray(response.data) && response.data[0]?.generated_text) {
-          aiResponse = response.data[0].generated_text.trim();
-        } else {
-          aiResponse = "I'm here to help with recipes! What would you like to cook?";
-        }
+        // Simple rule-based recipe assistant (no external API needed)
+        const aiResponse = generateRecipeResponse(message.toLowerCase());
 
         // Update usage counters
         globalUsageCount++;
