@@ -53,7 +53,7 @@ module.exports = function(router) {
         const HF_MODEL = 'facebook/blenderbot-400M-distill';
 
         const response = await axios.post(
-          `https://api-inference.huggingface.co/models/${HF_MODEL}`,
+          `https://router.huggingface.co/models/${HF_MODEL}`,
           {
             inputs: {
               text: message,
