@@ -1,59 +1,49 @@
-// routes/chat.js - AI Chat API with simple recipe assistant
+// routes/chat.js - AI Chat API with DeepSeek
+const axios = require('axios');
 const { authenticate } = require('../middleware/auth');
+const Recipe = require('../models/recipe');
 
-// Usage tracking - simple in-memory counter (resets on server restart)
+// Usage tracking
 let globalUsageCount = 0;
-const GLOBAL_LIMIT = 10000;
-const userTotalUsage = new Map(); // userId -> total count
-const USER_TOTAL_LIMIT = 200; // Total messages per user
+const GLOBAL_LIMIT = 1000;
+const userTotalUsage = new Map();
+const USER_TOTAL_LIMIT = 200;
 
-// Get user total usage count
 function getUserUsageCount(userId) {
   return userTotalUsage.get(userId) || 0;
 }
 
-// Simple rule-based recipe assistant
-function generateRecipeResponse(userMessage) {
-  const msg = userMessage.toLowerCase();
+// cache recipe list (refresh every 10 minutes)
+let recipeCache = null;
+let lastCacheTime = 0;
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
+async function getRecipeContext() {
+  const now = Date.now();
   
-  // greetings
-  if (msg.match(/^(hi|hello|hey|greetings)/)) {
-    return "Hello! I'm your recipe assistant. I can help you find recipes based on ingredients, dietary preferences, or meal types. What are you looking for today?";
-  }
-  
-  // ingredient-based queries
-  if (msg.includes('chicken')) {
-    return "Great choice! Try searching for 'Grilled Chicken', 'Chicken Curry', or 'Chicken Stir-fry'. Use the ingredient filter to find recipes with chicken!";
-  }
-  if (msg.includes('vegetarian') || msg.includes('vegan')) {
-    return "Looking for plant-based options? Try 'Veggie Buddha Bowl', 'Lentil Soup', or 'Mushroom Risotto'. Filter by vegetables in the gallery view!";
-  }
-  if (msg.includes('pasta')) {
-    return "Pasta lovers unite! Check out 'Carbonara', 'Aglio e Olio', or 'Pesto Pasta'. Browse our pasta recipes in the list view!";
-  }
-  if (msg.includes('dessert') || msg.includes('sweet')) {
-    return "Sweet tooth? Try 'Chocolate Cake', 'Tiramisu', or 'Fruit Tart'. Search for 'dessert' to see all options!";
-  }
-  if (msg.includes('quick') || msg.includes('easy') || msg.includes('fast')) {
-    return "Need something quick? Look for recipes with fewer ingredients in the gallery view. Most pasta and stir-fry dishes are ready in 30 minutes!";
-  }
-  if (msg.includes('healthy')) {
-    return "Healthy eating! Try salads, grilled proteins, or veggie-based dishes. Use the vegetable filter to find nutritious options!";
+  // use cache if valid
+  if (recipeCache && (now - lastCacheTime) < CACHE_DURATION) {
+    return recipeCache;
   }
   
-  // meal type queries
-  if (msg.includes('breakfast')) {
-    return "Breakfast ideas: Try searching for 'Pancakes', 'Omelette', or 'Smoothie Bowl'. Start your day right!";
+  try {
+    // get recipes from database (limit to 200 for performance)
+    const recipes = await Recipe.find({}, 'title ingredients').limit(200);
+    
+    // format recipe info for AI (only title + top 3 ingredients)
+    const recipeList = recipes.map(r => ({
+      title: r.title,
+      ingredients: r.ingredients?.slice(0, 3).join(', ') || 'N/A'
+    }));
+    
+    recipeCache = recipeList;
+    lastCacheTime = now;
+    
+    return recipeList;
+  } catch (error) {
+    console.error('Error fetching recipes:', error);
+    return [];
   }
-  if (msg.includes('lunch')) {
-    return "Lunch suggestions: 'Salad', 'Sandwich', or 'Soup' are great options. Browse the list view for more!";
-  }
-  if (msg.includes('dinner')) {
-    return "Dinner time! Consider 'Roasted Chicken', 'Salmon', or 'Stir-fry'. Check out the gallery for inspiration!";
-  }
-  
-  // default helpful response
-  return "I'm here to help you discover delicious recipes! Try telling me what ingredients you have, or what type of meal you're planning. You can also use the 'Browse Recipes' or 'By Ingredients' buttons to explore!";
 }
 
 module.exports = function(router) {
@@ -89,8 +79,53 @@ module.exports = function(router) {
           });
         }
 
-        // Simple rule-based recipe assistant (no external API needed)
-        const aiResponse = generateRecipeResponse(message.toLowerCase());
+        // Get recipe context from database
+        const recipes = await getRecipeContext();
+        
+        // Create recipe context string (sample 50 random recipes)
+        const sampleSize = Math.min(50, recipes.length);
+        const sampledRecipes = recipes
+          .sort(() => 0.5 - Math.random())
+          .slice(0, sampleSize);
+        
+        const recipeContext = sampledRecipes
+          .map(r => `- ${r.title} (${r.ingredients})`)
+          .join('\n');
+
+        // Call DeepSeek API
+        const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+        const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+
+        const response = await axios.post(
+          DEEPSEEK_API_URL,
+          {
+            model: 'deepseek-chat',
+            messages: [
+              {
+                role: 'system',
+                content: `You are a recipe assistant. Recommend recipes from this list:
+${recipeContext}
+
+Use EXACT recipe titles. Keep responses brief and friendly (under 80 words).`
+              },
+              {
+                role: 'user',
+                content: message
+              }
+            ],
+            max_tokens: 150,
+            temperature: 0.7
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 30000
+          }
+        );
+
+        const aiResponse = response.data.choices[0].message.content;
 
         // Update usage counters
         globalUsageCount++;
@@ -109,7 +144,6 @@ module.exports = function(router) {
       } catch (error) {
         console.error('Chat error:', error.response?.data || error.message);
         
-        // Handle rate limiting from Hugging Face
         if (error.response?.status === 429) {
           return res.status(429).json({
             success: false,
