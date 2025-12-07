@@ -20,4 +20,7 @@ module.exports = function (app, router) {
     
     // 用户自定义食谱 API
     app.use('/api', require('./user-recipes.js')(router));
+    
+    // AI Chat API
+    app.use('/api', require('./chat.js')(router));
 };
