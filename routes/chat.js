@@ -52,13 +52,13 @@ module.exports = function(router) {
   router.route('/chat')
     .post(authenticate, async (req, res) => {
       try {
-        const { message } = req.body;
+        const { messages } = req.body;
         const userId = req.user.userId;
 
-        if (!message || !message.trim()) {
+        if (!messages || !Array.isArray(messages) || messages.length === 0) {
           return res.status(400).json({ 
             success: false, 
-            message: 'Message is required' 
+            message: 'Messages are required' 
           });
         }
 
@@ -92,39 +92,34 @@ module.exports = function(router) {
           .map(r => `- ${r.title} (${r.ingredients})`)
           .join('\n');
 
-        // Call DeepSeek API
+        // Call DeepSeek API with full conversation history
         const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
         const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+
+        const systemMessage = {
+          role: 'system',
+          content: `You are RecipeGenie's AI assistant.
+
+RULES:
+1. GREETING: Say "Hi! I'm RecipeGenie's AI assistant. What would you like to eat today?"
+
+2. EASY RECOMMEND: If user mentions 2+ of these (ingredient, taste, cooking style), RECOMMEND 3-4 recipes immediately. Don't keep asking.
+   Examples: "chicken + spicy", "pork + fried", "vegetables + healthy"
+
+3. ASK ONCE: If user only gives 1 thing, ask for 1 more detail, then recommend.
+
+4. RECIPES:
+${recipeContext}
+
+5. Keep under 60 words. Use exact recipe titles.`
+        };
 
         const response = await axios.post(
           DEEPSEEK_API_URL,
           {
             model: 'deepseek-chat',
-            messages: [
-              {
-                role: 'system',
-                content: `You are RecipeGenie's AI assistant. CONVERSATION RULES:
-
-1. GREETING: If user says hi/hello → "Hi! I'm RecipeGenie's AI assistant. What would you like to eat today?"
-
-2. GATHER INFO FIRST:
-   - If user ONLY mentions taste/style (spicy, fried, healthy, etc.) → Ask "What ingredients do you have?"
-   - If user ONLY mentions ingredients (chicken, pork, etc.) → Ask "What taste or cooking style do you prefer?"
-   - If user mentions BOTH → Recommend 3-4 matching recipes
-
-3. STRICT MATCHING: Only recommend recipes that match BOTH user's ingredients AND preferences from:
-${recipeContext}
-
-4. NO MATCH: If no recipes match, say "Sorry, no matching recipes. Try [suggest alternatives]?"
-
-5. Keep under 50 words.`
-              },
-              {
-                role: 'user',
-                content: message
-              }
-            ],
-            max_tokens: 100,
+            messages: [systemMessage, ...messages],
+            max_tokens: 120,
             temperature: 0.7
           },
           {
