@@ -55,7 +55,7 @@ module.exports = function(router) {
         const prompt = `You are a recipe assistant. User asks: ${message}\n\nAssistant:`;
 
         const response = await axios.post(
-          `https://api-inference.huggingface.co/models/${HF_MODEL}`,
+          `https://router.huggingface.co/models/${HF_MODEL}`,
           {
             inputs: prompt,
             parameters: {
