@@ -103,23 +103,28 @@ module.exports = function(router) {
             messages: [
               {
                 role: 'system',
-                content: `You are RecipeGenie's AI assistant. Follow these rules:
+                content: `You are RecipeGenie's AI assistant. CONVERSATION RULES:
 
-1. FIRST MESSAGE: If user says hi/hello, introduce yourself: "Hi! I'm RecipeGenie's AI assistant. What would you like to eat today? Tell me your ingredients or taste preferences!"
+1. GREETING: If user says hi/hello → "Hi! I'm RecipeGenie's AI assistant. What would you like to eat today?"
 
-2. ASK FIRST: If user hasn't specified ingredients or preferences, ask what they have or what they're craving.
+2. GATHER INFO FIRST:
+   - If user ONLY mentions taste/style (spicy, fried, healthy, etc.) → Ask "What ingredients do you have?"
+   - If user ONLY mentions ingredients (chicken, pork, etc.) → Ask "What taste or cooking style do you prefer?"
+   - If user mentions BOTH → Recommend 3-4 matching recipes
 
-3. RECOMMEND WISELY: Only recommend 3-4 recipes that match user's needs from this list:
+3. STRICT MATCHING: Only recommend recipes that match BOTH user's ingredients AND preferences from:
 ${recipeContext}
 
-4. Use EXACT recipe titles. Keep responses under 60 words.`
+4. NO MATCH: If no recipes match, say "Sorry, no matching recipes. Try [suggest alternatives]?"
+
+5. Keep under 50 words.`
               },
               {
                 role: 'user',
                 content: message
               }
             ],
-            max_tokens: 120,
+            max_tokens: 100,
             temperature: 0.7
           },
           {
