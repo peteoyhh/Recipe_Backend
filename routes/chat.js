@@ -46,21 +46,19 @@ module.exports = function(router) {
           });
         }
 
-        // Call Hugging Face API
+        // Call Hugging Face API - using simpler model
         const HF_API_KEY = process.env.HUGGINGFACE_API_KEY;
-        const HF_MODEL = 'mistralai/Mixtral-8x7B-Instruct-v0.1';
-
-        const systemPrompt = `You are a helpful recipe assistant. Your job is to recommend recipes based on user requests. Keep responses short and friendly (max 150 words). If users ask about ingredients or cooking, suggest relevant recipes.`;
+        
+        // Use a smaller, faster model
+        const HF_MODEL = 'facebook/blenderbot-400M-distill';
 
         const response = await axios.post(
-          `https://router.huggingface.co/models/${HF_MODEL}`,
+          `https://api-inference.huggingface.co/models/${HF_MODEL}`,
           {
-            inputs: `${systemPrompt}\n\nUser: ${message}\n\nAssistant:`,
-            parameters: {
-              max_new_tokens: 150,
-              temperature: 0.7,
-              top_p: 0.9,
-              return_full_text: false
+            inputs: {
+              text: message,
+              past_user_inputs: [],
+              generated_responses: []
             }
           },
           {
@@ -73,8 +71,10 @@ module.exports = function(router) {
         );
 
         let aiResponse = '';
-        if (response.data && response.data[0] && response.data[0].generated_text) {
-          aiResponse = response.data[0].generated_text.trim();
+        if (response.data && response.data.generated_text) {
+          aiResponse = response.data.generated_text.trim();
+        } else if (response.data && typeof response.data === 'string') {
+          aiResponse = response.data.trim();
         } else {
           aiResponse = "I'm here to help! What kind of recipe are you looking for?";
         }
