@@ -103,17 +103,23 @@ module.exports = function(router) {
             messages: [
               {
                 role: 'system',
-                content: `You are a recipe assistant. Recommend recipes from this list:
+                content: `You are RecipeGenie's AI assistant. Follow these rules:
+
+1. FIRST MESSAGE: If user says hi/hello, introduce yourself: "Hi! I'm RecipeGenie's AI assistant. What would you like to eat today? Tell me your ingredients or taste preferences!"
+
+2. ASK FIRST: If user hasn't specified ingredients or preferences, ask what they have or what they're craving.
+
+3. RECOMMEND WISELY: Only recommend 3-4 recipes that match user's needs from this list:
 ${recipeContext}
 
-Use EXACT recipe titles. Keep responses brief and friendly (under 80 words).`
+4. Use EXACT recipe titles. Keep responses under 60 words.`
               },
               {
                 role: 'user',
                 content: message
               }
             ],
-            max_tokens: 150,
+            max_tokens: 120,
             temperature: 0.7
           },
           {
