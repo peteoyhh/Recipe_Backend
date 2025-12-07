@@ -13,6 +13,78 @@ function getUserUsageCount(userId) {
   return userTotalUsage.get(userId) || 0;
 }
 
+// Extract keywords from conversation for smart sampling
+function extractKeywords(messages) {
+  const keywords = new Set();
+  const commonWords = new Set(['i', 'want', 'like', 'need', 'have', 'get', 'give', 'me', 'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'to', 'of', 'and', 'or', 'but', 'in', 'on', 'at', 'for', 'with', 'from', 'by', 'about', 'into', 'through', 'during', 'including', 'until', 'against', 'among', 'throughout', 'despite', 'towards', 'upon', 'concerning', 'to', 'of', 'and', 'a', 'in', 'is', 'it', 'you', 'that', 'he', 'was', 'for', 'on', 'are', 'as', 'with', 'his', 'they', 'i', 'at', 'be', 'this', 'have', 'from', 'or', 'one', 'had', 'by', 'word', 'but', 'not', 'what', 'all', 'were', 'we', 'when', 'your', 'can', 'said', 'there', 'each', 'which', 'she', 'do', 'how', 'their', 'if', 'will', 'up', 'other', 'about', 'out', 'many', 'then', 'them', 'these', 'so', 'some', 'her', 'would', 'make', 'like', 'into', 'him', 'has', 'two', 'more', 'go', 'no', 'way', 'could', 'my', 'than', 'first', 'been', 'call', 'who', 'its', 'now', 'find', 'long', 'down', 'day', 'did', 'get', 'come', 'made', 'may', 'part']);
+  
+  // Extract all user messages
+  const userMessages = messages.filter(m => m.role === 'user');
+  
+  // Combine all user message content
+  const allText = userMessages.map(m => m.content.toLowerCase()).join(' ');
+  
+  // Split into words and filter
+  const words = allText.split(/\s+/)
+    .map(w => w.replace(/[^\w]/g, ''))
+    .filter(w => w.length > 2 && !commonWords.has(w));
+  
+  words.forEach(w => keywords.add(w));
+  
+  return Array.from(keywords);
+}
+
+// Smart sampling: filter recipes based on conversation keywords
+function smartSampleRecipes(recipes, messages, maxRecipes = 200) {
+  if (recipes.length === 0) return recipes;
+  
+  // Extract keywords from conversation
+  const keywords = extractKeywords(messages);
+  
+  // If no keywords or first message, return a diverse sample
+  if (keywords.length === 0 || messages.length <= 1) {
+    // Return diverse sample (mix of different types)
+    const sampleSize = Math.min(maxRecipes, recipes.length);
+    return recipes.slice(0, sampleSize);
+  }
+  
+  // Score recipes based on keyword matches
+  const scoredRecipes = recipes.map(recipe => {
+    let score = 0;
+    const recipeText = `${recipe.title} ${recipe.ingredients}`.toLowerCase();
+    
+    keywords.forEach(keyword => {
+      if (recipeText.includes(keyword)) {
+        // Title match is worth more
+        if (recipe.title.toLowerCase().includes(keyword)) {
+          score += 3;
+        } else {
+          score += 1;
+        }
+      }
+    });
+    
+    return { recipe, score };
+  });
+  
+  // Sort by score (highest first)
+  scoredRecipes.sort((a, b) => b.score - a.score);
+  
+  // Get matching recipes (score > 0)
+  const matchingRecipes = scoredRecipes
+    .filter(item => item.score > 0)
+    .map(item => item.recipe);
+  
+  // If we have enough matches, return top matches
+  if (matchingRecipes.length > 0) {
+    return matchingRecipes.slice(0, maxRecipes);
+  }
+  
+  // If no matches, return diverse sample
+  const sampleSize = Math.min(maxRecipes, recipes.length);
+  return recipes.slice(0, sampleSize);
+}
+
 // cache recipe list (refresh every 10 minutes)
 let recipeCache = null;
 let lastCacheTime = 0;
@@ -27,8 +99,8 @@ async function getRecipeContext() {
   }
   
   try {
-    // get recipes from database (limit to 200 for performance)
-    const recipes = await Recipe.find({}, 'title ingredients').limit(200);
+    // get all recipes from database
+    const recipes = await Recipe.find({}, 'title ingredients');
     
     // format recipe info for AI (only title + top 3 ingredients)
     const recipeList = recipes.map(r => ({
@@ -80,14 +152,12 @@ module.exports = function(router) {
         }
 
         // Get recipe context from database
-        const recipes = await getRecipeContext();
+        const allRecipes = await getRecipeContext();
         
-        // Create recipe context string (sample 50 random recipes)
-        const sampleSize = Math.min(50, recipes.length);
-        const sampledRecipes = recipes
-          .sort(() => 0.5 - Math.random())
-          .slice(0, sampleSize);
+        // Smart sampling: filter recipes based on conversation keywords
+        const sampledRecipes = smartSampleRecipes(allRecipes, messages, 200);
         
+        // Create recipe context string
         const recipeContext = sampledRecipes
           .map(r => `- ${r.title} (${r.ingredients})`)
           .join('\n');
