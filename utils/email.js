@@ -1,16 +1,10 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendVerificationCode = async (email, code) => {
-  const mailOptions = {
-    from: process.env.GMAIL_USER,
+  const { data, error } = await resend.emails.send({
+    from: 'RecipeGenie <onboarding@resend.dev>',
     to: email,
     subject: 'RecipeGenie - Email Verification Code',
     html: `
@@ -22,9 +16,9 @@ const sendVerificationCode = async (email, code) => {
         <p style="color: #888;">If you did not request this code, please ignore this email.</p>
       </div>
     `
-  };
-
-  return transporter.sendMail(mailOptions);
+  });
+  if (error) throw error;
+  return data;
 };
 
 const generateCode = () => {
