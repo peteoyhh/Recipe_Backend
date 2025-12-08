@@ -129,12 +129,15 @@ module.exports = function (router) {
         uploadStream.on('finish', () => {
           const imageUrl = `/api/gridfs-images/${filename.replace('.jpg', '')}`;
           return res.status(200).json({
-            message: '上传成功',
-            filename: filename,
-            imageUrl: imageUrl,
-            fullUrl: `${req.protocol}://${req.get('host')}${imageUrl}`,
-            fileId: uploadStream.id,
-            size: req.file.size
+            message: 'Upload successful',
+            success: true,
+            data: {
+              filename: filename,
+              imageUrl: imageUrl,
+              fullUrl: `${req.protocol}://${req.get('host')}${imageUrl}`,
+              fileId: uploadStream.id,
+              size: req.file.size
+            }
           });
         });
 

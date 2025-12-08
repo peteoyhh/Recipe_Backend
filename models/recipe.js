@@ -7,9 +7,11 @@ const RecipeSchema = new mongoose.Schema({
   ingredients: { type: [String], default: [] },
   instructions: { type: String },
   imageName: { type: String },
-  extractedIngredients: { type: [String], default: [] }
+  extractedIngredients: { type: [String], default: [] },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  isUserCreated: { type: Boolean, default: false }
 }, {
-  strict: false  // Allow additional fields if JSON has extra data
+  strict: false
 });
 
 module.exports = mongoose.model('Recipe', RecipeSchema);
