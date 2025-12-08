@@ -1,11 +1,11 @@
-const { Resend } = require('resend');
+const sgMail = require('@sendgrid/mail');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const sendVerificationCode = async (email, code) => {
-  const { data, error } = await resend.emails.send({
-    from: 'RecipeGenie <onboarding@resend.dev>',
+  const msg = {
     to: email,
+    from: 'hanxiaoyuinus@gmail.com',
     subject: 'RecipeGenie - Email Verification Code',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -16,9 +16,8 @@ const sendVerificationCode = async (email, code) => {
         <p style="color: #888;">If you did not request this code, please ignore this email.</p>
       </div>
     `
-  });
-  if (error) throw error;
-  return data;
+  };
+  return sgMail.send(msg);
 };
 
 const generateCode = () => {
