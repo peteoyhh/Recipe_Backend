@@ -29,6 +29,16 @@ const UserSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
+  emailVerified: {
+    type: Boolean,
+    default: false
+  },
+  verificationCode: {
+    type: String
+  },
+  verificationExpires: {
+    type: Date
+  },
   favorites: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Recipe'

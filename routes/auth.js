@@ -1,20 +1,17 @@
-// routes/auth.js
 const User = require('../models/user');
 const jwt = require('jsonwebtoken');
+const { pendingVerifications } = require('./verification');
 
-// JWT Secret - 在生产环境中应该使用环境变量
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const JWT_EXPIRES_IN = '7d'; // Token 有效期 7 天
+const JWT_EXPIRES_IN = '7d';
 
 module.exports = function (router) {
 
-  // POST /api/auth/register - 用户注册
   router.route('/auth/register')
     .post(async (req, res) => {
       try {
         const { username, email, password } = req.body;
 
-        // 验证输入
         if (!username || !email || !password) {
           return res.status(400).json({ 
             message: 'Please provide username, email and password',
@@ -22,7 +19,14 @@ module.exports = function (router) {
           });
         }
 
-        // 检查用户是否已存在
+        const pending = pendingVerifications.get(email);
+        if (!pending || !pending.verified || new Date() > pending.expires) {
+          return res.status(400).json({ 
+            message: 'Please verify your email first',
+            success: false
+          });
+        }
+
         const existingUser = await User.findOne({ 
           $or: [{ email }, { username }] 
         });
@@ -36,16 +40,16 @@ module.exports = function (router) {
           });
         }
 
-        // 创建新用户
         const user = new User({
           username,
           email,
-          password
+          password,
+          emailVerified: true
         });
 
         await user.save();
+        pendingVerifications.delete(email);
 
-        // 生成 JWT token
         const token = jwt.sign(
           { userId: user._id, username: user.username },
           JWT_SECRET,
@@ -75,13 +79,11 @@ module.exports = function (router) {
       }
     });
 
-  // POST /api/auth/login - 用户登录
   router.route('/auth/login')
     .post(async (req, res) => {
       try {
         const { email, password } = req.body;
 
-        // 验证输入
         if (!email || !password) {
           return res.status(400).json({ 
             message: 'Please provide email and password',
@@ -89,7 +91,6 @@ module.exports = function (router) {
           });
         }
 
-        // 查找用户
         const user = await User.findOne({ email });
 
         if (!user) {
@@ -99,7 +100,6 @@ module.exports = function (router) {
           });
         }
 
-        // 验证密码
         const isPasswordValid = await user.comparePassword(password);
 
         if (!isPasswordValid) {
@@ -109,7 +109,6 @@ module.exports = function (router) {
           });
         }
 
-        // 生成 JWT token
         const token = jwt.sign(
           { userId: user._id, username: user.username },
           JWT_SECRET,
@@ -141,7 +140,6 @@ module.exports = function (router) {
       }
     });
 
-  // GET /api/auth/me - 获取当前用户信息（需要认证）
   router.route('/auth/me')
     .get(async (req, res) => {
       try {
@@ -154,7 +152,6 @@ module.exports = function (router) {
           });
         }
 
-        // 验证 token
         const decoded = jwt.verify(token, JWT_SECRET);
         const user = await User.findById(decoded.userId)
           .select('-password')

@@ -1,42 +1,60 @@
-// routes/users.js
 const mongoose = require('mongoose');
 const User = require('../models/user');
 const Recipe = require('../models/recipe');
 const { buildQuery } = require('./utils');
+const { authenticate } = require('../middleware/auth');
+
+const maskEmail = (email) => {
+  if (!email) return '';
+  const [local, domain] = email.split('@');
+  if (local.length <= 2) return `${local[0]}***@${domain}`;
+  return `${local[0]}${local[1]}***@${domain}`;
+};
+
+const sanitizeUser = (user, showFullEmail = false) => {
+  const obj = user.toObject ? user.toObject() : user;
+  return {
+    _id: obj._id,
+    id: obj.id,
+    username: obj.username,
+    email: showFullEmail ? obj.email : maskEmail(obj.email),
+    favorites: obj.favorites || [],
+    createdRecipes: obj.createdRecipes || [],
+    createdAt: obj.createdAt,
+    updatedAt: obj.updatedAt
+  };
+};
 
 module.exports = function (router) {
 
   router.route('/users')
-    // GET all users or count
-    .get(async (req, res) => {
+    .get(authenticate, async (req, res) => {
       try {
         if (req.query.count === 'true') {
           const count = await buildQuery(User, req).countDocuments();
           return res.status(200).json({ message: 'OK', data: count });
         }
 
-        const result = await buildQuery(User, req).exec();
-        const data = Array.isArray(result) ? result : [result];
+        const result = await buildQuery(User, req).select('-password -verificationCode -verificationExpires').exec();
+        const users = Array.isArray(result) ? result : [result];
+        const data = users.map(u => sanitizeUser(u));
         return res.status(200).json({ message: 'OK', data });
       } catch (err) {
         return res.status(400).json({ message: err.message, data: [] });
       }
     })
 
-    // POST create new user
-    .post(async (req, res) => {
+    .post(authenticate, async (req, res) => {
       try {
         const { username, email, password, favorites } = req.body;
         if (!username || !email)
           return res.status(400).json({ message: 'Username and email are required', data: [] });
 
         const normalizedEmail = email.toLowerCase().trim();
-        // Check for duplicate email
         const existingEmail = await User.findOne({ email: normalizedEmail });
         if (existingEmail)
           return res.status(400).json({ message: 'Email already exists', data: [] });
 
-        // Validate favorites structure if provided
         let validFavorites = [];
         if (Array.isArray(favorites)) {
           validFavorites = favorites.filter(fav => 
@@ -47,12 +65,12 @@ module.exports = function (router) {
         const newUser = new User({
           username,
           email: normalizedEmail,
-          ...(password && { password }), // Only include password if provided
+          ...(password && { password }),
           favorites: validFavorites
         });
 
         const savedUser = await newUser.save();
-        return res.status(201).json({ message: 'User created', data: savedUser });
+        return res.status(201).json({ message: 'User created', data: sanitizeUser(savedUser, true) });
       } catch (err) {
         return res.status(500).json({ message: 'Server error creating user', data: err.message });
       }
@@ -305,9 +323,8 @@ module.exports = function (router) {
     });
 
 
-  // GET / PUT / DELETE by id
   router.route('/users/:id')
-    .get(async (req, res) => {
+    .get(authenticate, async (req, res) => {
       const id = req.params.id.trim();
       try {
         const userValidation = validateObjectId(id, 'Invalid user id format. Must be a valid MongoDB ObjectId');
@@ -315,32 +332,25 @@ module.exports = function (router) {
           return res.status(400).json({ message: userValidation.message, data: [] });
         }
 
-        const select = req.query.select ? JSON.parse(req.query.select) : null;
-        const user = await User.findById(id, select || undefined).lean();
+        const user = await User.findById(id).select('-password -verificationCode -verificationExpires').lean();
     
         if (!user)
           return res.status(404).json({ message: 'User not found', data: [] });
     
-        // enforce field order for response
-        const orderedUser = {
-          _id: user._id,
-          username: user.username,
-          email: user.email,
-          password: user.password,
-          favorites: user.favorites || [],
-          created_at: user.created_at,
-          updated_at: user.updated_at
-        };
-    
-        return res.status(200).json({ message: 'OK', data: orderedUser });
+        const isOwnProfile = req.user.userId === id;
+        return res.status(200).json({ message: 'OK', data: sanitizeUser(user, isOwnProfile) });
       } catch {
         return res.status(400).json({ message: 'Invalid request', data: [] });
       }
     })
 
-    .put(async (req, res) => {
+    .put(authenticate, async (req, res) => {
       const id = req.params.id.trim();
       try {
+        if (req.user.userId !== id) {
+          return res.status(403).json({ message: 'You can only update your own profile', data: [] });
+        }
+
         const userValidation = validateObjectId(id, 'Invalid user id format. Must be a valid MongoDB ObjectId');
         if (userValidation.error) {
           return res.status(400).json({ message: userValidation.message, data: [] });
@@ -352,27 +362,21 @@ module.exports = function (router) {
 
         const normalizedEmail = email.toLowerCase().trim();
 
-        // Check for email conflict (need to check before update)
         const conflict = await User.findOne({ email: normalizedEmail, _id: { $ne: id } });
         if (conflict)
           return res.status(400).json({ message: 'Email already exists', data: [] });
 
-        // Build update object
-        // Mongoose timestamps will automatically update updated_at
         const updateFields = {
           username,
           email: normalizedEmail
         };
 
-        // Add password if provided
         if (password) {
           updateFields.password = password;
         }
 
-        // Validate and update favorites if provided
         if (favorites !== undefined) {
           if (Array.isArray(favorites)) {
-            // Filter and validate favorites structure (recipe_id must be valid ObjectId string)
             updateFields.favorites = favorites.filter(fav => 
               fav && typeof fav.recipe_id === 'string' && mongoose.Types.ObjectId.isValid(fav.recipe_id) && fav.title && fav.saved_at
             );
@@ -381,29 +385,29 @@ module.exports = function (router) {
           }
         }
 
-        // Update user using findOneAndUpdate
         const updatedUser = await User.findOneAndUpdate(
           { _id: id },
           { $set: updateFields },
-          {
-            new: true, // Return updated document
-            runValidators: true
-          }
-        );
+          { new: true, runValidators: true }
+        ).select('-password -verificationCode -verificationExpires');
 
         if (!updatedUser) {
           return res.status(404).json({ message: 'User not found', data: [] });
         }
 
-        return res.status(200).json({ message: 'User updated', data: updatedUser });
+        return res.status(200).json({ message: 'User updated', data: sanitizeUser(updatedUser, true) });
       } catch (err) {
         return res.status(500).json({ message: 'Server error updating user', data: err.message });
       }
     })
 
-    .delete(async (req, res) => {
+    .delete(authenticate, async (req, res) => {
       const id = req.params.id.trim();
       try {
+        if (req.user.userId !== id) {
+          return res.status(403).json({ message: 'You can only delete your own account', data: [] });
+        }
+
         const userValidation = validateObjectId(id, 'Invalid user id format. Must be a valid MongoDB ObjectId');
         if (userValidation.error) {
           return res.status(400).json({ message: userValidation.message, data: [] });
