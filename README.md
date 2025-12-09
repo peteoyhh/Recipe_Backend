@@ -124,8 +124,8 @@ Bucket `recipeImages` initializes on DB connection.
 |--------|------|------|-------------|
 | GET | `/gridfs-images/:filename` | Public | Stream image by filename (tries with and without `.jpg`). |
 | GET | `/gridfs-images` | Public | List up to 100 stored images. |
-| POST | `/gridfs-images/upload` | user | Upload single image (`image` field, jpg/png/webp, ≤10MB). Replaces existing filename. |
-| POST | `/gridfs-images/batch-upload` | user | Upload up to 100 images at once. |
+| POST | `/gridfs-images/upload` | user | Upload single image (`image` field, jpg/png/webp, ≤10MB). Replaces existing filename. Use full path in curl: `-F "image=@/full/path/to/file.jpg"`. |
+| POST | `/gridfs-images/batch-upload` | user | Upload up to 100 images at once. Use full paths in curl. |
 
 ### AI Chat (DeepSeek)
 | Method | Path | Auth | Description |
