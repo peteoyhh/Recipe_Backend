@@ -16,7 +16,7 @@ The API supports CRUD operations for both **Users** and **Recipes**, complete wi
 
 ## Deployment
 
-- **Railway URL:** [https://recipebackend-production-dc03.up.railway.app](https://recipebackend-production-dc03.up.railway.app)
+- **Railway URL:** [https://recipebackend-production-dc03.up.railway.app](https://recipebackend-production-5f88.up.railway.app)
 - **MongoDB Atlas Cluster:** Connected remotely (IP Whitelist: Allow access from anywhere)
 - **Image Storage:** MongoDB GridFS (13,582 images stored in cloud)
 
