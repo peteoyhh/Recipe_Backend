@@ -46,6 +46,8 @@ MongoDB Atlas/URI must be reachable; server exits early if `MONGODB_URI` is miss
 - `POST /api/auth/login` — returns JWT.  
 - `GET /api/auth/me` — requires `Authorization: Bearer <token>`, returns user with favorites/created recipes populated.
 - Roles: default `user`; `dfsgds@gmail.com` is treated as `admin`.
+- Set `JWT_SECRET` in env (required; process exits if missing).
+- Test admin (for grading): `email: dfsgds@gmail.com`, `password: qq2000919`
 
 ### How to call (curl & Postman)
 
@@ -79,44 +81,42 @@ if (res?.data?.token) pm.collectionVariables.set("token", res.data.token);
 
 > Unless noted, all paths are under `/api`. Auth = requires `Authorization: Bearer <token>`.
 
-### Users (admin/maintenance; all routes require auth)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/users` | List users with query helpers `where`, `sort`, `select`, `skip`, `limit`, `count`. Passwords and verification fields are omitted. |
-| POST | `/users` | Create user (validates unique email). |
-| GET | `/users/:id` | Fetch user by Mongo `_id`; returns masked email unless requesting own profile. |
-| PUT | `/users/:id` | Update own profile (username/email/password, favorites). |
-| DELETE | `/users/:id` | Delete own account. |
-| POST | `/users/:id/favorites` | Add favorite by `recipe_id` in body. |
-| POST | `/users/:id/favorites/:recipe_id` | Add favorite by URL param. |
-| DELETE | `/users/:id/favorites/:recipe_id` | Remove favorite by URL param. |
-
-> Note: `/users` requires admin. `/users/:id` allows admin or the same user; others are forbidden.
+### Users (admin/maintenance)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/users` | admin | List users with query helpers `where`, `sort`, `select`, `skip`, `limit`, `count`. Passwords and verification fields are omitted. |
+| POST | `/users` | admin | Create user (validates unique email). |
+| GET | `/users/:id` | admin or self | Fetch user by Mongo `_id`; returns masked email unless requesting own profile. |
+| PUT | `/users/:id` | admin or self | Update profile (username/email/password, favorites). |
+| DELETE | `/users/:id` | admin or self | Delete account. |
+| POST | `/users/:id/favorites` | admin or self | Add favorite by `recipe_id` in body. |
+| POST | `/users/:id/favorites/:recipe_id` | admin or self | Add favorite by URL param. |
+| DELETE | `/users/:id/favorites/:recipe_id` | admin or self | Remove favorite by URL param. |
 
 ### Recipes
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/recipes` | Public | List recipes with `where`, `sort`, `select`, `skip`, `limit`, `count`; default limit 100. |
-| POST | `/recipes` | Public | Create recipe; numeric `id` auto-increments if omitted. |
+| POST | `/recipes` | user | Create recipe; numeric `id` auto-increments if omitted. |
 | GET | `/recipes/:id` | Public | Fetch by Mongo `_id` (not the numeric `id`). |
-| PUT | `/recipes/:id` | Public | Update recipe fields; rejects duplicate numeric `id`. |
-| DELETE | `/recipes/:id` | Public | Delete recipe by Mongo `_id`. |
+| PUT | `/recipes/:id` | auth (admin or creator) | Update recipe fields; admin can edit any; creator can edit own user-created recipes; non-user-created recipes are admin-only; rejects duplicate numeric `id`. |
+| DELETE | `/recipes/:id` | auth (admin or creator) | Delete recipe by Mongo `_id`; admin can delete any; creator can delete own user-created recipes; non-user-created recipes are admin-only. |
 
 ### Favorites (uses ObjectId references)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/favorites` | Required | Return current user's favorites with `imageUrl` constructed from `RAILWAY_URL` or host. |
-| POST | `/favorites/:recipeId` | Required | Add recipe to favorites. |
-| DELETE | `/favorites/:recipeId` | Required | Remove recipe from favorites. |
-| GET | `/favorites/check/:recipeId` | Required | Returns `isFavorited`. |
+| GET | `/favorites` | user | Return current user's favorites with `imageUrl` constructed from `RAILWAY_URL` or host. |
+| POST | `/favorites/:recipeId` | user | Add recipe to favorites. |
+| DELETE | `/favorites/:recipeId` | user | Remove recipe from favorites. |
+| GET | `/favorites/check/:recipeId` | user | Returns `isFavorited`. |
 
 ### User Recipes (owned content)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/user-recipes` | Required | Recipes created by current user (adds `imageUrl`, `isUserCreated`, `createdBy`). |
-| POST | `/user-recipes` | Required | Create recipe; uses next numeric `id` (starts at 10000 if no recipes). |
-| PUT | `/user-recipes/:recipeId` | Required | Edit own recipe only. |
-| DELETE | `/user-recipes/:recipeId` | Required | Delete own recipe and unlink from user. |
+| GET | `/user-recipes` | user | Recipes created by current user (adds `imageUrl`, `isUserCreated`, `createdBy`). |
+| POST | `/user-recipes` | user | Create recipe; uses next numeric `id` (starts at 10000 if no recipes). |
+| PUT | `/user-recipes/:recipeId` | user | Edit own recipe only. |
+| DELETE | `/user-recipes/:recipeId` | user | Delete own recipe and unlink from user. |
 
 ### Images (MongoDB GridFS)
 Bucket `recipeImages` initializes on DB connection.
@@ -124,14 +124,14 @@ Bucket `recipeImages` initializes on DB connection.
 |--------|------|------|-------------|
 | GET | `/gridfs-images/:filename` | Public | Stream image by filename (tries with and without `.jpg`). |
 | GET | `/gridfs-images` | Public | List up to 100 stored images. |
-| POST | `/gridfs-images/upload` | Public | Upload single image (`image` field, jpg/png/webp, ≤10MB). Replaces existing filename. |
-| POST | `/gridfs-images/batch-upload` | Public | Upload up to 100 images at once. |
+| POST | `/gridfs-images/upload` | user | Upload single image (`image` field, jpg/png/webp, ≤10MB). Replaces existing filename. |
+| POST | `/gridfs-images/batch-upload` | user | Upload up to 100 images at once. |
 
 ### AI Chat (DeepSeek)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/chat` | Required | `{"messages":[{role,content}]}`; injects recipe context, returns AI reply plus remaining quotas. Limits: global 1000 requests, 200 per user. |
-| GET | `/chat/stats` | Required | Remaining quota snapshot. |
+| POST | `/chat` | user | `{"messages":[{role,content}]}`; injects recipe context, returns AI reply plus remaining quotas. Limits: global 1000 requests, 200 per user. |
+| GET | `/chat/stats` | user | Remaining quota snapshot. |
 
 ### Root
 `GET /` and `GET /api/` return simple HTML/health info.

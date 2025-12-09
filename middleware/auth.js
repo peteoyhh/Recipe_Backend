@@ -1,7 +1,11 @@
 // middleware/auth.js
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('❌ No JWT_SECRET found in env');
+  process.exit(1);
+}
 
 // Authenticate: verify JWT and attach user info
 function authenticate(req, res, next) {

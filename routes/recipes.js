@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const Recipe = require('../models/recipe');
 const { buildQuery } = require('./utils');
+const { authenticate } = require('../middleware/auth');
 
 module.exports = function (router) {
 
@@ -22,8 +23,8 @@ module.exports = function (router) {
       }
     })
 
-    // POST create new recipe
-    .post(async (req, res) => {
+    // POST create new recipe (auth required)
+    .post(authenticate, async (req, res) => {
       try {
         const { id, title, ingredients, instructions, imageName, extractedIngredients } = req.body;
         if (!title)
@@ -98,7 +99,7 @@ module.exports = function (router) {
       }
     })
 
-    .put(async (req, res) => {
+    .put(authenticate, async (req, res) => {
       const id = req.params.id.trim();
       try {
         if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -112,6 +113,15 @@ module.exports = function (router) {
         const recipe = await Recipe.findById(id);
         if (!recipe)
           return res.status(404).json({ message: 'Recipe not found', data: [] });
+
+        const isOwner = recipe.createdBy?.toString && recipe.createdBy.toString() === req.user.userId;
+        const isAdmin = req.user.role === 'admin';
+        if (!isOwner && !isAdmin && recipe.isUserCreated) {
+          return res.status(403).json({ message: 'You do not have permission to edit this recipe', data: [] });
+        }
+        if (!isAdmin && !recipe.isUserCreated) {
+          return res.status(403).json({ message: 'Only admin can edit non user-created recipes', data: [] });
+        }
 
         // Check for id conflict if id is being changed
         if (recipeId !== undefined && recipeId !== recipe.id) {
@@ -141,7 +151,7 @@ module.exports = function (router) {
       }
     })
 
-    .delete(async (req, res) => {
+    .delete(authenticate, async (req, res) => {
       const id = req.params.id.trim();
       try {
         if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -151,6 +161,15 @@ module.exports = function (router) {
         const recipe = await Recipe.findById(id);
         if (!recipe)
           return res.status(404).json({ message: 'Recipe not found', data: [] });
+
+        const isOwner = recipe.createdBy?.toString && recipe.createdBy.toString() === req.user.userId;
+        const isAdmin = req.user.role === 'admin';
+        if (!isOwner && !isAdmin && recipe.isUserCreated) {
+          return res.status(403).json({ message: 'You do not have permission to delete this recipe', data: [] });
+        }
+        if (!isAdmin && !recipe.isUserCreated) {
+          return res.status(403).json({ message: 'Only admin can delete non user-created recipes', data: [] });
+        }
 
         await recipe.deleteOne();
         return res.status(200).json({ message: 'Recipe deleted', data: [] });

@@ -3,6 +3,7 @@
 
 const mongoose = require('mongoose');
 const multer = require('multer');
+const { authenticate } = require('../middleware/auth');
 
 let bucket;
 
@@ -89,7 +90,7 @@ module.exports = function (router) {
 
   // POST /api/gridfs-images/upload - 上传图片到 MongoDB
   router.route('/gridfs-images/upload')
-    .post(upload.single('image'), async (req, res) => {
+    .post(authenticate, upload.single('image'), async (req, res) => {
       try {
         if (!bucket) {
           return res.status(500).json({ 
@@ -158,7 +159,7 @@ module.exports = function (router) {
 
   // POST /api/gridfs-images/batch-upload - 批量上传
   router.route('/gridfs-images/batch-upload')
-    .post(upload.array('images', 100), async (req, res) => {
+    .post(authenticate, upload.array('images', 100), async (req, res) => {
       try {
         if (!bucket) {
           return res.status(500).json({ 
