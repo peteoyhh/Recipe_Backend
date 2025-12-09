@@ -3,8 +3,10 @@
 Backend for RecipeGenie built with **Node.js**, **Express**, and **Mongoose**. Features JWT auth with email verification, CRUD for recipes, user favorites and personal recipes, GridFS image storage, and an AI chat endpoint powered by DeepSeek.
 
 **Deployment:**
-- Homepage: `https://recipebackend-production-5f88.up.railway.app`
-- API Base: `https://recipebackend-production-5f88.up.railway.app/api`
+- Homepage: [https://recipebackend-production-5f88.up.railway.app](https://recipebackend-production-5f88.up.railway.app)
+- API Base: [https://recipebackend-production-5f88.up.railway.app/api](https://recipebackend-production-5f88.up.railway.app/api)
+- Front_end doc: [https://github.com/Rain625/cs409-final](https://github.com/Rain625/cs409-final)
+- Live Site: [https://Rain625.github.io/cs409-final](https://Rain625.github.io/cs409-final)
 
 ---
 
