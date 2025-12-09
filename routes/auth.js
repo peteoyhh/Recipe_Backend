@@ -4,6 +4,7 @@ const { pendingVerifications } = require('./verification');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const JWT_EXPIRES_IN = '7d';
+const ADMIN_EMAIL = 'dfsgds@gmail.com';
 
 module.exports = function (router) {
 
@@ -44,14 +45,15 @@ module.exports = function (router) {
           username,
           email,
           password,
-          emailVerified: true
+          emailVerified: true,
+          role: email.toLowerCase() === ADMIN_EMAIL ? 'admin' : 'user'
         });
 
         await user.save();
         pendingVerifications.delete(email);
 
         const token = jwt.sign(
-          { userId: user._id, username: user.username },
+          { userId: user._id, username: user.username, role: user.role },
           JWT_SECRET,
           { expiresIn: JWT_EXPIRES_IN }
         );
@@ -100,6 +102,12 @@ module.exports = function (router) {
           });
         }
 
+        // Ensure admin email stays admin
+        if (user.email.toLowerCase() === ADMIN_EMAIL && user.role !== 'admin') {
+          user.role = 'admin';
+          await user.save();
+        }
+
         const isPasswordValid = await user.comparePassword(password);
 
         if (!isPasswordValid) {
@@ -110,7 +118,7 @@ module.exports = function (router) {
         }
 
         const token = jwt.sign(
-          { userId: user._id, username: user.username },
+          { userId: user._id, username: user.username, role: user.role },
           JWT_SECRET,
           { expiresIn: JWT_EXPIRES_IN }
         );
@@ -123,6 +131,7 @@ module.exports = function (router) {
               _id: user._id,
               username: user.username,
               email: user.email,
+              role: user.role,
               favorites: user.favorites,
               createdRecipes: user.createdRecipes
             },

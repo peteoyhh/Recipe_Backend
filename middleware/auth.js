@@ -3,10 +3,9 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// 认证中间件 - 验证 JWT token
+// Authenticate: verify JWT and attach user info
 function authenticate(req, res, next) {
   try {
-    // 从 header 中获取 token
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -18,13 +17,12 @@ function authenticate(req, res, next) {
 
     const token = authHeader.replace('Bearer ', '');
 
-    // 验证 token
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    // 将用户信息添加到请求对象
     req.user = {
       userId: decoded.userId,
-      username: decoded.username
+      username: decoded.username,
+      role: decoded.role || 'user'
     };
 
     next();
@@ -46,7 +44,7 @@ function authenticate(req, res, next) {
   }
 }
 
-// 可选认证中间件 - token 可以不存在
+// Optional authenticate: token may be absent
 function optionalAuthenticate(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
@@ -56,7 +54,8 @@ function optionalAuthenticate(req, res, next) {
       const decoded = jwt.verify(token, JWT_SECRET);
       req.user = {
         userId: decoded.userId,
-        username: decoded.username
+        username: decoded.username,
+        role: decoded.role || 'user'
       };
     }
     
@@ -67,8 +66,22 @@ function optionalAuthenticate(req, res, next) {
   }
 }
 
+// Authorize: ensure role is allowed
+function authorize(allowedRoles = []) {
+  return (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        message: 'Forbidden',
+        success: false
+      });
+    }
+    next();
+  };
+}
+
 module.exports = {
   authenticate,
-  optionalAuthenticate
+  optionalAuthenticate,
+  authorize
 };
 

@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../models/user');
 const Recipe = require('../models/recipe');
 const { buildQuery } = require('./utils');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 
 const maskEmail = (email) => {
   if (!email) return '';
@@ -28,7 +28,7 @@ const sanitizeUser = (user, showFullEmail = false) => {
 module.exports = function (router) {
 
   router.route('/users')
-    .get(authenticate, async (req, res) => {
+    .get(authenticate, authorize(['admin']), async (req, res) => {
       try {
         if (req.query.count === 'true') {
           const count = await buildQuery(User, req).countDocuments();
@@ -44,7 +44,7 @@ module.exports = function (router) {
       }
     })
 
-    .post(authenticate, async (req, res) => {
+    .post(authenticate, authorize(['admin']), async (req, res) => {
       try {
         const { username, email, password, favorites } = req.body;
         if (!username || !email)
@@ -338,6 +338,11 @@ module.exports = function (router) {
           return res.status(404).json({ message: 'User not found', data: [] });
     
         const isOwnProfile = req.user.userId === id;
+        const isAdmin = req.user.role === 'admin';
+        if (!isOwnProfile && !isAdmin) {
+          return res.status(403).json({ message: 'Forbidden', data: [] });
+        }
+
         return res.status(200).json({ message: 'OK', data: sanitizeUser(user, isOwnProfile) });
       } catch {
         return res.status(400).json({ message: 'Invalid request', data: [] });
@@ -347,7 +352,7 @@ module.exports = function (router) {
     .put(authenticate, async (req, res) => {
       const id = req.params.id.trim();
       try {
-        if (req.user.userId !== id) {
+        if (req.user.userId !== id && req.user.role !== 'admin') {
           return res.status(403).json({ message: 'You can only update your own profile', data: [] });
         }
 
@@ -404,7 +409,7 @@ module.exports = function (router) {
     .delete(authenticate, async (req, res) => {
       const id = req.params.id.trim();
       try {
-        if (req.user.userId !== id) {
+        if (req.user.userId !== id && req.user.role !== 'admin') {
           return res.status(403).json({ message: 'You can only delete your own account', data: [] });
         }
 
