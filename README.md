@@ -1,4 +1,4 @@
-# MP3: Recipe Management API
+# Final Project: Recipe Management API
 
 **Course:** CS 409 Fall 2025  
 **Author:** Pete Chen  
