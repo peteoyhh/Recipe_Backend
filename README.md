@@ -53,7 +53,6 @@ MongoDB Atlas/URI must be reachable; server exits early if `MONGODB_URI` is miss
 - `GET /api/auth/me` — requires `Authorization: Bearer <token>`, returns user with favorites/created recipes populated.
 - Roles: default `user`; `dfsgds@gmail.com` is treated as `admin`.
 - Set `JWT_SECRET` in env (required; process exits if missing).
-- Test admin (for grading): `email: dfsgds@gmail.com`, `password: qq2000919`
 
 ### How to call (curl & Postman)
 
